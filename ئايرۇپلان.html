@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="ug" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>3D زامانىۋى ھاۋا جېڭى - دەرىجىدىن تاشقىرى زىچ شەھەر</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+        body { overflow: hidden; background: #000; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        canvas { display: block; }
+
+        #damage-overlay {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle, rgba(255,0,0,0) 40%, rgba(255,0,30,0.65) 100%);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.12s ease-out;
+            z-index: 8;
+        }
+
+        #hud {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            color: #00ffcc;
+            text-shadow: 0 0 8px rgba(0, 255, 204, 0.8);
+            z-index: 10;
+        }
+
+        .crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 90px;
+            height: 90px;
+            transform: translate(-50%, -50%);
+            border: 2px solid rgba(0, 255, 204, 0.65);
+            border-radius: 50%;
+            box-shadow: inset 0 0 12px rgba(0, 255, 204, 0.3);
+        }
+        .crosshair::before, .crosshair::after {
+            content: '';
+            position: absolute;
+            background: #00ffcc;
+        }
+        .crosshair::before { top: 50%; left: -18px; right: -18px; height: 1.5px; }
+        .crosshair::after { left: 50%; top: -18px; bottom: -18px; width: 1.5px; }
+
+        .panel-left {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 20, 30, 0.75);
+            border: 1px solid #00ffcc;
+            padding: 15px 20px;
+            border-radius: 8px;
+            direction: ltr;
+            text-align: left;
+            min-width: 245px;
+        }
+        .panel-right {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 20, 30, 0.75);
+            border: 1px solid #00ffcc;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.85;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 6px 0;
+            font-size: 15px;
+            font-weight: bold;
+        }
+        .bar-bg {
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.15);
+            margin-top: 4px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+            border: 1px solid rgba(0, 255, 204, 0.4);
+        }
+        .bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ffcc, #ff3300);
+            width: 50%;
+            transition: width 0.1s;
+        }
+        #hp-bar {
+            background: #00ff66;
+            width: 100%;
+            transition: width 0.2s, background-color 0.2s;
+        }
+
+        #radar {
+            position: absolute;
+            bottom: 25px;
+            left: 25px;
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            border: 2px solid #00ffcc;
+            background: radial-gradient(circle, rgba(0,60,50,0.75) 0%, rgba(0,15,20,0.9) 100%);
+        }
+
+        .overlay-screen {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle, rgba(10,25,47,0.92) 0%, rgba(2,6,15,0.98) 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            z-index: 100;
+            text-align: center;
+            padding: 20px;
+        }
+        .overlay-screen h1 {
+            font-size: 40px;
+            color: #00ffcc;
+            text-shadow: 0 0 20px #00ffcc;
+            margin-bottom: 15px;
+        }
+        .overlay-screen p {
+            font-size: 18px;
+            color: #cbd5e1;
+            max-width: 650px;
+            line-height: 1.7;
+            margin-bottom: 30px;
+        }
+        .action-btn {
+            padding: 15px 45px;
+            font-size: 22px;
+            font-weight: bold;
+            color: #00151a;
+            background: #00ffcc;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 25px rgba(0, 255, 204, 0.8);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .action-btn:hover {
+            transform: scale(1.06);
+            box-shadow: 0 0 40px rgba(0, 255, 204, 1);
+        }
+
+        #gameover-screen {
+            display: none;
+            background: radial-gradient(circle, rgba(60,10,15,0.92) 0%, rgba(10,2,5,0.98) 100%);
+        }
+        #gameover-screen h1 {
+            color: #ff3344;
+            text-shadow: 0 0 25px #ff3344;
+        }
+
+        .msg-banner {
+            position: absolute;
+            bottom: 45px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 22px;
+            font-weight: bold;
+            color: #ffcc00;
+            text-shadow: 0 0 12px rgba(255, 204, 0, 0.9);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .warning-banner {
+            position: absolute;
+            top: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+            font-weight: bold;
+            color: #ff2244;
+            text-shadow: 0 0 15px rgba(255, 0, 40, 1);
+            opacity: 0;
+        }
+    </style>
+</head>
+<body>
+
+<div id="damage-overlay"></div>
+
+<!-- باشلاش ئېكرانى -->
+<div class="overlay-screen" id="start-screen">
+    <h1>✈️ 3D زامانىۋى ھاۋا جېڭى (يېپىشقاق ئاۋات شەھەر)</h1>
+    <p>
+        بىنالار ئارىسىدىكى بارلىق بوشلۇقلار 1200+ رەڭگارەڭ بىنا، 2000+ يېشىل دەرەخ، ئاسما كۆۋرۈكلەر، تەنتەربىيە مەيدانى، مۇنار ۋە توختىماي ماڭىدىغان ماشىنىلار بىلەن لىق تولدۇرۇلدى!
+    </p>
+    <button class="action-btn" id="start-btn">جەڭنى باشلاش</button>
+</div>
+
+<!-- مەغلۇب بولۇش ئېكرانى -->
+<div class="overlay-screen" id="gameover-screen">
+    <h1>💥 ئايروپىلانىڭىز پارتلاپ كەتتى!</h1>
+    <p id="final-score-text">سىز جەمئىي 0 دۈشمەن ئايروپىلانىنى يوقاتتىڭىز.</p>
+    <button class="action-btn" id="restart-btn">قايتا جەڭ قىلىش</button>
+</div>
+
+<!-- HUD كۆرۈنمە يۈزى -->
+<div id="hud">
+    <div class="crosshair"></div>
+    <div class="warning-banner" id="low-hp-warning">⚠️ دىققەت: ئايروپىلان ئېغىر زەخىملەندى!</div>
+
+    <div class="panel-left">
+        <div class="stat-row"><span>HP (جان):</span> <span id="hp-val" style="color:#00ff66;">100%</span></div>
+        <div class="bar-bg"><div id="hp-bar"></div></div>
+
+        <div class="stat-row"><span>SPEED (تېزلىك):</span> <span><span id="spd-val">600</span> km/h</span></div>
+        <div class="bar-bg"><div class="bar-fill" id="spd-bar"></div></div>
+
+        <div class="stat-row"><span>ALT (ئېگىزلىك):</span> <span><span id="alt-val">300</span> m</span></div>
+        <div class="stat-row"><span>ENEMIES (دۈشمەن):</span> <span id="enemy-val" style="color:#ff4455;">5</span></div>
+        <div class="stat-row"><span>KILLS (نەتىجە):</span> <span id="kills-val" style="color:#ffcc00;">0</span></div>
+        <div class="stat-row"><span>MODE (مۇھىت):</span> <span id="mode-val">DAY</span></div>
+    </div>
+
+    <div class="panel-right">
+        <div>🎮 <b>كونترول قىلىش كۇنۇپكىلىرى:</b></div>
+        <div>• <b>W</b> ياكى <b>↑</b> : يۇقىرىغا ئۆرلەش</div>
+        <div>• <b>S</b> ياكى <b>↓</b> : تۆۋەنگە چۈشۈش</div>
+        <div>• <b>A / D</b> ياكى <b>← / →</b> : سول / ئوڭغا بۇرۇلۇش</div>
+        <div>• <b>Shift</b> : دەرىجىدىن تاشقىرى تېزلىتىش (Turbo)</div>
+        <div>• <b>Space (بوشلۇق)</b> : ئاپتوماتىك نىشانلىق پىلىموت</div>
+        <div>• <b>F</b> ياكى <b>مائۇس سول كۇنۇپكا</b> : قوغلىغۇچى راكېتا</div>
+        <div>• <b>C</b> : كۈندۈز / كەچ / كېچە ئالماشتۇرۇش</div>
+    </div>
+
+    <canvas id="radar" width="160" height="160"></canvas>
+    <div class="msg-banner" id="msg-banner">💥 دۈشمەن يوقىتىلدى! (+15% جان)</div>
+</div>
+
+<!-- Three.js Library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+// ==================== 1. ئاۋاز سىستېمىسى (Web Audio API) ====================
+class SoundEngine {
+    constructor() {
+        this.ctx = null;
+        this.initialized = false;
+    }
+
+    init() {
+        if (this.initialized) return;
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioCtx();
+
+        this.engineOsc = this.ctx.createOscillator();
+        this.engineOsc.type = 'sawtooth';
+        this.engineOsc.frequency.value = 60;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 220;
+
+        this.engineGain = this.ctx.createGain();
+        this.engineGain.gain.value = 0.1;
+
+        this.engineOsc.connect(filter);
+        filter.connect(this.engineGain);
+        this.engineGain.connect(this.ctx.destination);
+        this.engineOsc.start();
+
+        const bufferSize = this.ctx.sampleRate * 2;
+        const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+
+        const whiteNoise = this.ctx.createBufferSource();
+        whiteNoise.buffer = noiseBuffer;
+        whiteNoise.loop = true;
+
+        this.noiseFilter = this.ctx.createBiquadFilter();
+        this.noiseFilter.type = 'bandpass';
+        this.noiseFilter.frequency.value = 350;
+
+        this.noiseGain = this.ctx.createGain();
+        this.noiseGain.gain.value = 0.07;
+
+        whiteNoise.connect(this.noiseFilter);
+        this.noiseFilter.connect(this.noiseGain);
+        this.noiseGain.connect(this.ctx.destination);
+        whiteNoise.start();
+
+        this.initialized = true;
+    }
+
+    updateEngine(speedRatio, boost, muted = false) {
+        if (!this.initialized) return;
+        const now = this.ctx.currentTime;
+        if (muted) {
+            this.engineGain.gain.setTargetAtTime(0, now, 0.1);
+            this.noiseGain.gain.setTargetAtTime(0, now, 0.1);
+            return;
+        }
+        this.engineGain.gain.setTargetAtTime(0.1, now, 0.1);
+        const targetFreq = 55 + speedRatio * 85 + (boost ? 40 : 0);
+        this.engineOsc.frequency.setTargetAtTime(targetFreq, now, 0.08);
+        this.noiseFilter.frequency.setTargetAtTime(300 + speedRatio * 800, now, 0.08);
+        this.noiseGain.gain.setTargetAtTime(boost ? 0.2 : 0.07, now, 0.1);
+    }
+
+    playGun() {
+        if (!this.initialized) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(210, now);
+        osc.frequency.exponentialRampToValueAtTime(50, now + 0.055);
+        gain.gain.setValueAtTime(0.14, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.055);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.055);
+    }
+
+    playEnemyLaser() {
+        if (!this.initialized) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.exponentialRampToValueAtTime(110, now + 0.09);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.09);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.09);
+    }
+
+    playHitWarning() {
+        if (!this.initialized) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.setValueAtTime(95, now + 0.06);
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.18);
+    }
+
+    playMissile() {
+        if (!this.initialized) return;
+        const now = this.ctx.currentTime;
+        const bufferSize = this.ctx.sampleRate * 0.55;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1100, now);
+        filter.frequency.exponentialRampToValueAtTime(280, now + 0.55);
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.32, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.55);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        noise.start(now);
+    }
+
+    playExplosion() {
+        if (!this.initialized) return;
+        const now = this.ctx.currentTime;
+        const bufferSize = this.ctx.sampleRate * 1.2;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.35));
+        }
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(260, now);
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.75, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 1.2);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        noise.start(now);
+    }
+}
+
+const sound = new SoundEngine();
+
+// ==================== 2. 3D سەھنە ۋە مۇھىت قۇرۇش ====================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x5ca0ff);
+scene.fog = new THREE.FogExp2(0x5ca0ff, 0.00018);
+
+const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.5, 8000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.78);
+scene.add(ambientLight);
+
+const sunLight = new THREE.DirectionalLight(0xfff8e7, 1.25);
+sunLight.position.set(1000, 1800, 800);
+sunLight.castShadow = true;
+scene.add(sunLight);
+
+const themes = [
+    { name: 'DAY (كۈندۈز)', sky: 0x5ca0ff, fog: 0x5ca0ff, sun: 0xfff8e7, amb: 0.78 },
+    { name: 'SUNSET (شەپەق)', sky: 0xff5e3a, fog: 0xff7b54, sun: 0xffaa44, amb: 0.52 },
+    { name: 'NIGHT (كېچە)', sky: 0x050b1a, fog: 0x050b1a, sun: 0x3366ff, amb: 0.30 }
+];
+let currentTheme = 0;
+
+function cycleTheme() {
+    currentTheme = (currentTheme + 1) % themes.length;
+    const t = themes[currentTheme];
+    scene.background.setHex(t.sky);
+    scene.fog.color.setHex(t.fog);
+    sunLight.color.setHex(t.sun);
+    ambientLight.intensity = t.amb;
+    document.getElementById('mode-val').innerText = t.name;
+}
+
+// ==================== 3. تاغلىق، يېشىللىق ۋە دەرىجىدىن تاشقىرى زىچ شەھەر ====================
+const worldSize = 10000;
+const cityRadius = 1550;
+const groundGeo = new THREE.PlaneGeometry(worldSize, worldSize, 140, 140);
+groundGeo.rotateX(-Math.PI / 2);
+
+const posAttr = groundGeo.attributes.position;
+const colors = [];
+
+function getTerrainHeight(x, z) {
+    const dist = Math.sqrt(x * x + z * z);
+    if (dist <= cityRadius) return 0;
+    const factor = (dist - cityRadius) / 1200;
+    let y = (Math.sin(x * 0.0022) * Math.cos(z * 0.0022) * 380 +
+             Math.sin(x * 0.006 + z * 0.005) * 140 +
+             Math.abs(Math.sin(x * 0.0014 - z * 0.0014)) * 500) * Math.min(factor, 1.5);
+    return Math.max(0, y);
+}
+
+for (let i = 0; i < posAttr.count; i++) {
+    const x = posAttr.getX(i);
+    const z = posAttr.getZ(i);
+    const y = getTerrainHeight(x, z);
+    posAttr.setY(i, y);
+
+    if (y > 390) {
+        colors.push(0.96, 0.98, 1.0); // قارلىق چوققا
+    } else if (y > 140) {
+        colors.push(0.45, 0.41, 0.36); // تاغ قىيالىرى
+    } else {
+        colors.push(0.18, 0.46, 0.23); // يېشىل چىملىق ۋە ئورمانلىق تەگلىكى
+    }
+}
+groundGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+groundGeo.computeVertexNormals();
+
+const ground = new THREE.Mesh(groundGeo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+ground.receiveShadow = true;
+scene.add(ground);
+
+// شەھەر كوچا، باغچا، مەيدان ۋە پىيادىلەر يولى تېكستۇرىسى (بىنالار ئارىسى چۆل كۆرۈنمەسلىكى ئۈچۈن)
+function createDetailedCityGroundTexture() {
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 512;
+    const ctx = c.getContext('2d');
+
+    // ئاساسىي ئاسفالت چوڭ يول
+    ctx.fillStyle = '#252a34';
+    ctx.fillRect(0, 0, 512, 512);
+
+    // 4 دانە مەھەللە بىنا ئورنى ۋە يورۇق پىيادىلەر مەيدانى
+    const blocks = [[36, 36, 200, 200], [276, 36, 200, 200], [36, 276, 200, 200], [276, 276, 200, 200]];
+    blocks.forEach(([bx, by, bw, bh]) => {
+        // سىرتقى پىيادىلەر يولى (ئاچ كۈلرەڭ تاش يول)
+        ctx.fillStyle = '#7c8594';
+        ctx.fillRect(bx, by, bw, bh);
+
+        // ئىچكى يېشىل چىملىق باغچا بەلبېغى
+        ctx.fillStyle = '#2e6f40';
+        ctx.fillRect(bx + 12, by + 12, bw - 24, bh - 24);
+
+        // مەركىزىي مەرمەر مەيدان
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(bx + 28, by + 28, bw - 56, bh - 56);
+
+        // مەيدان ئىچىدىكى نەقىش سىزىقلىرى
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(bx + 36, by + 36, bw - 72, bh - 72);
+    });
+
+    // يول ئوتتۇرىسىدىكى قوش سېرىق سىزىق
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(18, 0); ctx.lineTo(18, 512);
+    ctx.moveTo(256, 0); ctx.lineTo(256, 512);
+    ctx.moveTo(0, 18); ctx.lineTo(512, 18);
+    ctx.moveTo(0, 256); ctx.lineTo(512, 256);
+    ctx.stroke();
+
+    // ئاق پىيادىلەر زېبرا سىزىقلىرى
+    ctx.fillStyle = '#f8fafc';
+    for (let i = 45; i < 470; i += 20) {
+        if (Math.abs(i - 256) < 25) continue;
+        ctx.fillRect(i, 4, 8, 22);
+        ctx.fillRect(i, 244, 8, 22);
+        ctx.fillRect(4, i, 22, 8);
+        ctx.fillRect(244, i, 22, 8);
+    }
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(14, 14);
+    return tex;
+}
+
+const cityPlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(3100, 3100),
+    new THREE.MeshLambertMaterial({ map: createDetailedCityGroundTexture() })
+);
+cityPlane.rotation.x = -Math.PI / 2;
+cityPlane.position.y = 0.8;
+scene.add(cityPlane);
+
+// شەھەر دەرياسى ۋە ھەيۋەتلىك ئاسما كۆۋرۈكلەر
+const river = new THREE.Mesh(
+    new THREE.PlaneGeometry(140, 3100),
+    new THREE.MeshPhongMaterial({ color: 0x0088dd, emissive: 0x002b4d, shininess: 120 })
+);
+river.rotation.x = -Math.PI / 2;
+river.position.set(110, 1.4, 0);
+scene.add(river);
+
+const bridgeTowerMat = new THREE.MeshPhongMaterial({ color: 0xff3b30 });
+for (let z = -1100; z <= 1100; z += 360) {
+    const bridge = new THREE.Mesh(
+        new THREE.BoxGeometry(170, 5, 38),
+        new THREE.MeshLambertMaterial({ color: 0x94a3b8 })
+    );
+    bridge.position.set(110, 8, z);
+    scene.add(bridge);
+
+    // كۆۋرۈك قىزىل تۈۋرۈكلىرى (Golden Gate ئۇسلۇبىدا)
+    [-55, 55].forEach(ox => {
+        const pylon = new THREE.Mesh(new THREE.BoxGeometry(8, 65, 38), bridgeTowerMat);
+        pylon.position.set(110 + ox, 32, z);
+        scene.add(pylon);
+    });
+}
+
+// شەھەرنى كېسىپ ئۆتىدىغان ئېگىز ئاسما تاشيول (Elevated Highway Overpasses)
+const highwayMat = new THREE.MeshLambertMaterial({ color: 0x475569 });
+[-440, 440].forEach(pos => {
+    const hwyX = new THREE.Mesh(new THREE.BoxGeometry(3000, 4, 26), highwayMat);
+    hwyX.position.set(0, 22, pos);
+    scene.add(hwyX);
+
+    const hwyZ = new THREE.Mesh(new THREE.BoxGeometry(26, 4, 3000), highwayMat);
+    hwyZ.position.set(pos, 32, 0);
+    scene.add(hwyZ);
+});
+
+// ==================== يورۇق ۋە زامانىۋى بىنا تېكستۇرىسى (قارا بىنا بولۇپ قالماسلىقى ئۈچۈن) ====================
+function createBrightBuildingTexture(facadeColor, glassColor, glowColor) {
+    const c = document.createElement('canvas');
+    c.width = 128; c.height = 256;
+    const ctx = c.getContext('2d');
+
+    // بىنا سىرتقى تام رەڭگى (يورۇق مەرمەر، كۈمۈش ياكى ئەينەك تەگلىك)
+    ctx.fillStyle = facadeColor;
+    ctx.fillRect(0, 0, 128, 256);
+
+    // زامانىۋى دېرىزە قاتارلىرى
+    for (let y = 6; y < 248; y += 12) {
+        for (let x = 6; x < 120; x += 14) {
+            ctx.fillStyle = Math.random() > 0.35 ? glassColor : glowColor;
+            ctx.fillRect(x, y, 10, 8);
+        }
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+}
+
+const bldMaterials = [
+    // 1. كۆك ئەينەكلىك زامانىۋى ئېگىز بىنا
+    new THREE.MeshPhongMaterial({
+        map: createBrightBuildingTexture('#3b5978', '#7dd3fc', '#fef08a'),
+        emissive: 0x1e3a5f,
+        emissiveIntensity: 0.45,
+        shininess: 100
+    }),
+    // 2. ئاق-كۈمۈش رەڭلىك سودا سارىيى
+    new THREE.MeshPhongMaterial({
+        map: createBrightBuildingTexture('#94a3b8', '#38bdf8', '#ffffff'),
+        emissive: 0x334155,
+        emissiveIntensity: 0.35,
+        shininess: 90
+    }),
+    // 3. ئىللىق ئالتۇن-قوڭۇر رەڭلىك مېھمانساراي بىناسى
+    new THREE.MeshPhongMaterial({
+        map: createBrightBuildingTexture('#78624c', '#fde047', '#fed7aa'),
+        emissive: 0x423321,
+        emissiveIntensity: 0.4,
+        shininess: 80
+    }),
+    // 4. يېشىل-فىرۇزە ئەينەكلىك بىنا
+    new THREE.MeshPhongMaterial({
+        map: createBrightBuildingTexture('#2c5e5a', '#5eead4', '#fef9c3'),
+        emissive: 0x133836,
+        emissiveIntensity: 0.45,
+        shininess: 100
+    })
+];
+
+// ==================== 1200+ زىچ بىنا، پودىيۇم، دۇكان ۋە مەنزىرە قۇرۇلۇشلىرى ====================
+const cityGroup = new THREE.Group();
+scene.add(cityGroup);
+
+const podiumMat = new THREE.MeshLambertMaterial({ color: 0x64748b });
+const roofLightMat = new THREE.MeshBasicMaterial({ color: 0xff1744 });
+const neonMats = [
+    new THREE.MeshBasicMaterial({ color: 0x00f0ff }),
+    new THREE.MeshBasicMaterial({ color: 0xff007f }),
+    new THREE.MeshBasicMaterial({ color: 0xffe600 }),
+    new THREE.MeshBasicMaterial({ color: 0x00ff66 })
+];
+
+// شەھەر كاتەكچىلىرىنى ئىنتايىن زىچ قىلىپ تىزىش (ئارىلىقىدا قۇرۇق يەر قالمايدۇ)
+const blockStep = 110;
+for (let gx = -1430; gx <= 1430; gx += blockStep) {
+    for (let gz = -1430; gz <= 1430; gz += blockStep) {
+        // دەريا ئورنىنى ساقلاپ قېلىش
+        if (Math.abs(gx - 110) < 82) continue;
+        // ئاسما تاشيول ئۈستىنى ساقلاپ قېلىش
+        if (Math.abs(gx - 440) < 22 || Math.abs(gx + 440) < 22 || Math.abs(gz - 440) < 22 || Math.abs(gz + 440) < 22) continue;
+
+        const distFromCenter = Math.sqrt(gx * gx + gz * gz);
+        if (distFromCenter > 1520) continue;
+
+        // ھەر بىر مەھەللىنىڭ ئاستىغا كەڭ سودا سارىيى پودىيۇمى (Podium) قوشۇمىز — بىنالار ئارىسى تۇتاش كۆرۈنىدۇ
+        if (distFromCenter < 1150) {
+            const podium = new THREE.Mesh(new THREE.BoxGeometry(86, 12, 86), podiumMat);
+            podium.position.set(gx, 6, gz);
+            cityGroup.add(podium);
+
+            // پودىيۇم يېنىغا يورۇق رەڭلىك ئېلان ئېكرانى
+            const billboard = new THREE.Mesh(
+                new THREE.BoxGeometry(88, 3.5, 88),
+                neonMats[(Math.abs(gx + gz)) % neonMats.length]
+            );
+            billboard.position.set(gx, 12.5, gz);
+            cityGroup.add(billboard);
+        }
+
+        const heightFactor = Math.max(0.25, 1.45 - distFromCenter / 1150);
+
+        // ھەر بىر كىچىك بۆلەكتە 4 دانە يانمۇ-يان بىنا (ئارىلىقىدا چۆللۈك قالمايدۇ)
+        const offsets = [[-22, -22], [22, -22], [-22, 22], [22, 22]];
+        offsets.forEach(([ox, oz], idx) => {
+            const bx = gx + ox;
+            const bz = gz + oz;
+
+            const w = 32 + Math.random() * 10;
+            const d = 32 + Math.random() * 10;
+            const h = (38 + Math.random() * 230) * heightFactor;
+            const mat = bldMaterials[(Math.abs(gx) + idx) % bldMaterials.length];
+
+            const bld = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+            bld.position.set(bx, h / 2, bz);
+            cityGroup.add(bld);
+
+            // ئېگىز بىنالارنىڭ چوققىسى
+            if (h > 135) {
+                const topH = 16 + Math.random() * 22;
+                const topBox = new THREE.Mesh(new THREE.BoxGeometry(w * 0.62, topH, d * 0.62), mat);
+                topBox.position.set(bx, h + topH / 2, bz);
+                cityGroup.add(topBox);
+
+                const beacon = new THREE.Mesh(new THREE.SphereGeometry(2, 6, 6), roofLightMat);
+                beacon.position.set(bx, h + topH + 2.5, bz);
+                cityGroup.add(beacon);
+            }
+        });
+    }
+}
+
+// شەھەر مەركىزىدىكى چوڭ تەنتەربىيە سارىيى (Illuminated Stadium)
+const stadiumGroup = new THREE.Group();
+const stadiumOuter = new THREE.Mesh(
+    new THREE.CylinderGeometry(95, 75, 28, 32, 1, true),
+    new THREE.MeshPhongMaterial({ color: 0xe2e8f0, side: THREE.DoubleSide })
+);
+stadiumOuter.position.y = 14;
+stadiumGroup.add(stadiumOuter);
+
+const pitchField = new THREE.Mesh(
+    new THREE.CircleGeometry(72, 32),
+    new THREE.MeshBasicMaterial({ color: 0x16a34a })
+);
+pitchField.rotation.x = -Math.PI / 2;
+pitchField.position.y = 2;
+stadiumGroup.add(pitchField);
+
+const stadiumRing = new THREE.Mesh(
+    new THREE.TorusGeometry(95, 2.5, 8, 32),
+    new THREE.MeshBasicMaterial({ color: 0x00f0ff })
+);
+stadiumRing.rotation.x = Math.PI / 2;
+stadiumRing.position.y = 28;
+stadiumGroup.add(stadiumRing);
+
+stadiumGroup.position.set(-220, 1, 0);
+scene.add(stadiumGroup);
+
+// ==================== 2200 دانە 3D دەل-دەرەخ (InstancedMesh بىلەن يۇقىرى سۈرئەتتە) ====================
+const treeCount = 2200;
+const trunkGeo = new THREE.CylinderGeometry(1.5, 2.2, 8, 5);
+const trunkMat = new THREE.MeshLambertMaterial({ color: 0x5c4033 });
+const foliageGeo = new THREE.ConeGeometry(9.5, 24, 6);
+const foliageMat = new THREE.MeshLambertMaterial({ color: 0x228b22 });
+
+const trunkInst = new THREE.InstancedMesh(trunkGeo, trunkMat, treeCount);
+const foliageInst = new THREE.InstancedMesh(foliageGeo, foliageMat, treeCount);
+const dummy = new THREE.Object3D();
+
+for (let i = 0; i < treeCount; i++) {
+    let tx, tz, ty = 0;
+    if (i < 900) {
+        // شەھەر كوچىلىرى ۋە بىنالار ئارىسىدىكى يېشىل دەرەخلەر
+        tx = (Math.random() - 0.5) * 2900;
+        tz = (Math.random() - 0.5) * 2900;
+        if (Math.abs(tx - 110) < 85) tx += 140;
+    } else {
+        // شەھەر گىرۋىكى بىلەن تاغ ئارىسىدىكى بارلىق بوشلۇقنى تولدۇرىدىغان ئورمانلىق
+        const angle = Math.random() * Math.PI * 2;
+        const r = 1350 + Math.random() * 1400;
+        tx = Math.cos(angle) * r;
+        tz = Math.sin(angle) * r;
+        ty = getTerrainHeight(tx, tz);
+    }
+
+    const scale = 0.8 + Math.random() * 0.7;
+    dummy.position.set(tx, ty + 4 * scale, tz);
+    dummy.scale.set(scale, scale, scale);
+    dummy.updateMatrix();
+    trunkInst.setMatrixAt(i, dummy.matrix);
+
+    dummy.position.set(tx, ty + 15 * scale, tz);
+    dummy.updateMatrix();
+    foliageInst.setMatrixAt(i, dummy.matrix);
+}
+scene.add(trunkInst);
+scene.add(foliageInst);
+
+// ==================== 260 دانە يولدا ماڭىدىغان ماشىنا ====================
+const cars = [];
+const carGeo = new THREE.BoxGeometry(5, 2.5, 10);
+const carColors = [0xffffff, 0xffd700, 0xff2244, 0x00e5ff, 0xff6600, 0x00ff88];
+
+for (let i = 0; i < 260; i++) {
+    const isXAxis = Math.random() > 0.5;
+    const onHighway = i < 60;
+    let roadCoord, yPos;
+
+    if (onHighway) {
+        roadCoord = Math.random() > 0.5 ? 440 : -440;
+        yPos = isXAxis ? 25 : 35;
+    } else {
+        const idx = Math.floor((Math.random() - 0.5) * 24);
+        roadCoord = idx * blockStep + 55;
+        if (Math.abs(roadCoord - 110) < 85) roadCoord += 110;
+        yPos = 2.2;
+    }
+
+    const car = new THREE.Mesh(carGeo, new THREE.MeshBasicMaterial({ color: carColors[i % carColors.length] }));
+    const posAlong = (Math.random() - 0.5) * 2800;
+    const dir = Math.random() > 0.5 ? 1 : -1;
+    const laneOffset = dir * 5.5;
+
+    if (isXAxis) {
+        car.position.set(posAlong, yPos, roadCoord + laneOffset);
+        car.rotation.y = Math.PI / 2;
+    } else {
+        car.position.set(roadCoord + laneOffset, yPos, posAlong);
+    }
+
+    car.userData = { isXAxis, speed: (1.5 + Math.random() * 1.5) * dir };
+    scene.add(car);
+    cars.push(car);
+}
+
+// بۇلۇتلار
+const cloudGeo = new THREE.DodecahedronGeometry(45, 1);
+const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+for (let i = 0; i < 55; i++) {
+    const cluster = new THREE.Group();
+    for (let j = 0; j < 4; j++) {
+        const m = new THREE.Mesh(cloudGeo, cloudMat);
+        m.position.set((Math.random() - 0.5) * 65, (Math.random() - 0.5) * 20, (Math.random() - 0.5) * 65);
+        m.scale.set(1 + Math.random(), 0.6 + Math.random() * 0.4, 1 + Math.random());
+        cluster.add(m);
+    }
+    cluster.position.set((Math.random() - 0.5) * 6800, 560 + Math.random() * 450, (Math.random() - 0.5) * 6800);
+    scene.add(cluster);
+}
+
+// ==================== 4. ئايروپىلان مودېلى ====================
+function buildJetMesh(isEnemy = false) {
+    const group = new THREE.Group();
+
+    const mainColor = isEnemy ? 0x991122 : 0x3b4859;
+    const wingColor = isEnemy ? 0x221115 : 0x1e2631;
+    const glassColor = isEnemy ? 0xffaa00 : 0x00e5ff;
+    const flameColor = isEnemy ? 0xff2200 : 0xff6600;
+
+    const bodyMat = new THREE.MeshPhongMaterial({ color: mainColor, shininess: 95, specular: 0x99aabb });
+    const darkMat = new THREE.MeshPhongMaterial({ color: wingColor, shininess: 50 });
+    const glassMat = new THREE.MeshPhongMaterial({ color: glassColor, transparent: true, opacity: 0.72, shininess: 120 });
+    const glowMat = new THREE.MeshBasicMaterial({ color: flameColor });
+
+    const noseGeo = new THREE.ConeGeometry(1.3, 9, 6);
+    noseGeo.rotateX(Math.PI / 2);
+    const nose = new THREE.Mesh(noseGeo, bodyMat);
+    nose.position.z = -9.5;
+    group.add(nose);
+
+    const fuselageGeo = new THREE.CylinderGeometry(1.3, 1.8, 12, 6);
+    fuselageGeo.rotateX(Math.PI / 2);
+    const fuselage = new THREE.Mesh(fuselageGeo, bodyMat);
+    fuselage.position.z = 1;
+    group.add(fuselage);
+
+    const canopyGeo = new THREE.SphereGeometry(1.05, 12, 12);
+    canopyGeo.scale(0.85, 0.65, 3.2);
+    const canopy = new THREE.Mesh(canopyGeo, glassMat);
+    canopy.position.set(0, 0.85, -3.5);
+    group.add(canopy);
+
+    const wingShape = new THREE.Shape();
+    wingShape.moveTo(0, 0);
+    wingShape.lineTo(11, 4.5);
+    wingShape.lineTo(11, 6.8);
+    wingShape.lineTo(1.5, 8.0);
+    wingShape.lineTo(0, 0);
+
+    const wingGeo = new THREE.ExtrudeGeometry(wingShape, { depth: 0.22, bevelEnabled: false });
+    wingGeo.rotateX(Math.PI / 2);
+
+    const rightWing = new THREE.Mesh(wingGeo, bodyMat);
+    rightWing.position.set(0.5, 0.1, -3);
+    group.add(rightWing);
+
+    const leftWing = rightWing.clone();
+    leftWing.scale.x = -1;
+    leftWing.position.x = -0.5;
+    group.add(leftWing);
+
+    const tailShape = new THREE.Shape();
+    tailShape.moveTo(0, 0);
+    tailShape.lineTo(0, 3.5);
+    tailShape.lineTo(-1.8, 3.5);
+    tailShape.lineTo(-3.2, 0);
+
+    const tailGeo = new THREE.ExtrudeGeometry(tailShape, { depth: 0.15, bevelEnabled: false });
+    tailGeo.rotateY(Math.PI / 2);
+
+    const rightTail = new THREE.Mesh(tailGeo, darkMat);
+    rightTail.position.set(1.1, 0.5, 4.2);
+    rightTail.rotation.z = -0.28;
+    group.add(rightTail);
+
+    const leftTail = new THREE.Mesh(tailGeo, darkMat);
+    leftTail.position.set(-1.1, 0.5, 4.2);
+    leftTail.rotation.z = 0.28;
+    group.add(leftTail);
+
+    const jetFlames = [];
+    [-0.75, 0.75].forEach(xOffset => {
+        const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.55, 1.8, 12), darkMat);
+        nozzle.rotation.x = Math.PI / 2;
+        nozzle.position.set(xOffset, 0, 7.2);
+        group.add(nozzle);
+
+        const flameGeo = new THREE.ConeGeometry(0.55, 4.8, 12);
+        flameGeo.rotateX(-Math.PI / 2);
+        const flame = new THREE.Mesh(flameGeo, glowMat.clone());
+        flame.position.set(xOffset, 0, 9.8);
+        group.add(flame);
+        jetFlames.push(flame);
+    });
+
+    if (isEnemy) {
+        const ring = new THREE.Mesh(
+            new THREE.RingGeometry(16, 18, 24),
+            new THREE.MeshBasicMaterial({ color: 0xff2244, side: THREE.DoubleSide })
+        );
+        ring.name = "targetRing";
+        group.add(ring);
+    }
+
+    group.userData.flames = jetFlames;
+    return group;
+}
+
+const jet = buildJetMesh(false);
+scene.add(jet);
+// ئايروپىلان دەل ئاۋات شەھەرنىڭ ئۈستىدىن باشلايدۇ
+jet.position.set(0, 340, 850);
+
+// ==================== 5. جان سىستېمىسى، دۈشمەنلەر ۋە ئوقلار ====================
+const ENEMY_COUNT = 5;
+const enemies = [];
+const bullets = [];
+const enemyBullets = [];
+const missiles = [];
+const particles = [];
+
+let playerHP = 100;
+let kills = 0;
+let isGameOver = false;
+let screenShake = 0;
+
+function updateHealthUI() {
+    const hpBar = document.getElementById('hp-bar');
+    const hpVal = document.getElementById('hp-val');
+    const lowWarn = document.getElementById('low-hp-warning');
+
+    hpBar.style.width = playerHP + '%';
+    hpVal.innerText = playerHP + '%';
+
+    if (playerHP > 50) {
+        hpBar.style.backgroundColor = '#00ff66';
+        hpVal.style.color = '#00ff66';
+        lowWarn.style.opacity = 0;
+    } else if (playerHP > 25) {
+        hpBar.style.backgroundColor = '#ffcc00';
+        hpVal.style.color = '#ffcc00';
+        lowWarn.style.opacity = 0;
+    } else {
+        hpBar.style.backgroundColor = '#ff2244';
+        hpVal.style.color = '#ff2244';
+        lowWarn.style.opacity = 1;
+    }
+}
+
+function applyDamage(amount) {
+    if (isGameOver) return;
+    playerHP = Math.max(0, playerHP - amount);
+    updateHealthUI();
+    sound.playHitWarning();
+    screenShake = 12;
+
+    const dmgOverlay = document.getElementById('damage-overlay');
+    dmgOverlay.style.opacity = 1;
+    setTimeout(() => { dmgOverlay.style.opacity = 0; }, 160);
+
+    if (playerHP <= 0) {
+        triggerGameOver();
+    }
+}
+
+function healPlayer(amount) {
+    if (isGameOver) return;
+    playerHP = Math.min(100, playerHP + amount);
+    updateHealthUI();
+}
+
+function triggerGameOver() {
+    isGameOver = true;
+    createExplosion(jet.position, 85);
+    jet.visible = false;
+    sound.updateEngine(0, false, true);
+    document.getElementById('final-score-text').innerText = `سىز بۇ قېتىملىق جەڭدە جەمئىي ${kills} دۈشمەن ئايروپىلانىنى پاچاقلىدىڭىز!`;
+    setTimeout(() => {
+        document.getElementById('gameover-screen').style.display = 'flex';
+    }, 900);
+}
+
+function resetGame() {
+    playerHP = 100;
+    kills = 0;
+    isGameOver = false;
+    jet.visible = true;
+    jet.position.set(0, 340, 850);
+    jetYaw = 0;
+    jetPitch = 0;
+    jetRoll = 0;
+    speed = 4.2;
+
+    document.getElementById('kills-val').innerText = '0';
+    updateHealthUI();
+
+    enemyBullets.forEach(b => scene.remove(b));
+    enemyBullets.length = 0;
+    bullets.forEach(b => scene.remove(b));
+    bullets.length = 0;
+    missiles.forEach(m => scene.remove(m));
+    missiles.length = 0;
+
+    enemies.forEach(e => scene.remove(e));
+    enemies.length = 0;
+    for (let i = 0; i < ENEMY_COUNT; i++) spawnEnemyJet();
+
+    document.getElementById('gameover-screen').style.display = 'none';
+}
+
+function spawnEnemyJet() {
+    const enemy = buildJetMesh(true);
+    enemy.scale.set(1.35, 1.35, 1.35);
+
+    const angle = (Math.random() - 0.5) * Math.PI * 1.4;
+    const dist = 500 + Math.random() * 850;
+    enemy.position.set(
+        jet.position.x + Math.sin(angle) * dist,
+        250 + Math.random() * 300,
+        jet.position.z - Math.cos(angle) * dist
+    );
+
+    enemy.userData = {
+        yaw: Math.random() * Math.PI * 2,
+        pitch: 0,
+        roll: 0,
+        speed: 3.2 + Math.random() * 0.7,
+        turnTimer: 0,
+        turnRate: (Math.random() - 0.5) * 0.018,
+        targetAlt: 260 + Math.random() * 280,
+        shootCooldown: 60 + Math.floor(Math.random() * 90),
+        flames: enemy.userData.flames
+    };
+
+    scene.add(enemy);
+    enemies.push(enemy);
+}
+
+for (let i = 0; i < ENEMY_COUNT; i++) {
+    spawnEnemyJet();
+}
+
+function fireEnemyBullet(enemy) {
+    sound.playEnemyLaser();
+    const b = new THREE.Mesh(
+        new THREE.BoxGeometry(0.65, 0.65, 12),
+        new THREE.MeshBasicMaterial({ color: 0xff2244 })
+    );
+    b.position.copy(enemy.position);
+
+    const dir = new THREE.Vector3().subVectors(jet.position, enemy.position).normalize();
+    dir.x += (Math.random() - 0.5) * 0.08;
+    dir.y += (Math.random() - 0.5) * 0.08;
+    dir.z += (Math.random() - 0.5) * 0.08;
+    dir.normalize();
+
+    b.lookAt(b.position.clone().add(dir));
+    b.userData = { vel: dir.multiplyScalar(17), life: 95 };
+    scene.add(b);
+    enemyBullets.push(b);
+}
+
+// ==================== 6. پارتلاش ۋە ئويۇنچى قورال سىستېمىسى ====================
+function createExplosion(pos, count = 45) {
+    sound.playExplosion();
+    for (let i = 0; i < count; i++) {
+        const p = new THREE.Mesh(
+            new THREE.SphereGeometry(2.5 + Math.random() * 4.5, 6, 6),
+            new THREE.MeshBasicMaterial({ color: Math.random() > 0.35 ? 0xff4400 : 0xffdd00 })
+        );
+        p.position.copy(pos);
+        p.userData = {
+            vel: new THREE.Vector3((Math.random() - 0.5) * 18, (Math.random() - 0.5) * 18, (Math.random() - 0.5) * 18),
+            life: 1.0
+        };
+        scene.add(p);
+        particles.push(p);
+    }
+}
+
+function findBestTarget() {
+    let best = null;
+    let minDist = Infinity;
+    enemies.forEach(e => {
+        const d = e.position.distanceTo(jet.position);
+        if (d < minDist) {
+            minDist = d;
+            best = e;
+        }
+    });
+    return best;
+}
+
+function fireBullet() {
+    if (isGameOver) return;
+    sound.playGun();
+    const target = findBestTarget();
+
+    [-1.8, 1.8].forEach(offset => {
+        const b = new THREE.Mesh(
+            new THREE.BoxGeometry(0.45, 0.45, 10),
+            new THREE.MeshBasicMaterial({ color: 0x00ffff })
+        );
+        b.position.copy(jet.position);
+        b.quaternion.copy(jet.quaternion);
+        b.translateX(offset);
+        b.translateZ(-10);
+
+        let dir = new THREE.Vector3(0, 0, -1).applyQuaternion(jet.quaternion).normalize();
+
+        if (target && target.position.distanceTo(jet.position) < 1200) {
+            const toEnemy = new THREE.Vector3().subVectors(target.position, b.position).normalize();
+            if (dir.dot(toEnemy) > 0.75) {
+                dir.lerp(toEnemy, 0.65).normalize();
+            }
+        }
+
+        b.userData = { vel: dir.multiplyScalar(34), life: 75 };
+        scene.add(b);
+        bullets.push(b);
+    });
+}
+
+function fireMissile() {
+    if (isGameOver) return;
+    sound.playMissile();
+    const m = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.5, 0.5, 7, 8),
+        new THREE.MeshBasicMaterial({ color: 0xffaa00 })
+    );
+    m.geometry.rotateX(Math.PI / 2);
+    m.position.copy(jet.position);
+    m.quaternion.copy(jet.quaternion);
+    m.translateY(-1.5);
+    m.translateZ(-9);
+
+    const nearest = findBestTarget();
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(jet.quaternion);
+    m.userData = { vel: dir.multiplyScalar(20), target: nearest, life: 190 };
+    scene.add(m);
+    missiles.push(m);
+}
+
+// ==================== 7. كونترول قىلىش ====================
+const keys = {};
+window.addEventListener('keydown', e => {
+    keys[e.code] = true;
+    if (e.code === 'KeyF' && gameStarted && !isGameOver) fireMissile();
+    if (e.code === 'KeyC') cycleTheme();
+});
+window.addEventListener('keyup', e => keys[e.code] = false);
+window.addEventListener('mousedown', e => {
+    if (e.button === 0 && gameStarted && !isGameOver) fireMissile();
+});
+
+let gameStarted = false;
+document.getElementById('start-btn').addEventListener('click', () => {
+    sound.init();
+    document.getElementById('start-screen').style.display = 'none';
+    gameStarted = true;
+});
+
+document.getElementById('restart-btn').addEventListener('click', () => {
+    resetGame();
+});
+
+let jetYaw = 0;
+let jetPitch = 0;
+let jetRoll = 0;
+let speed = 4.2;
+let gunCooldown = 0;
+
+const radarCtx = document.getElementById('radar').getContext('2d');
+
+function showKillBanner() {
+    const banner = document.getElementById('msg-banner');
+    banner.style.opacity = 1;
+    setTimeout(() => banner.style.opacity = 0, 1400);
+}
+
+function drawRadar() {
+    radarCtx.clearRect(0, 0, 160, 160);
+    radarCtx.strokeStyle = 'rgba(0, 255, 204, 0.35)';
+    radarCtx.beginPath();
+    radarCtx.arc(80, 80, 50, 0, Math.PI * 2);
+    radarCtx.stroke();
+
+    radarCtx.fillStyle = '#00ffcc';
+    radarCtx.beginPath();
+    radarCtx.arc(80, 80, 4, 0, Math.PI * 2);
+    radarCtx.fill();
+
+    enemies.forEach(e => {
+        const dx = (e.position.x - jet.position.x) * 0.035;
+        const dz = (e.position.z - jet.position.z) * 0.035;
+        const rx = dx * Math.cos(jetYaw) - dz * Math.sin(jetYaw);
+        const rz = dx * Math.sin(jetYaw) + dz * Math.cos(jetYaw);
+        if (rx * rx + rz * rz < 72 * 72) {
+            radarCtx.fillStyle = '#ff2244';
+            radarCtx.beginPath();
+            radarCtx.arc(80 + rx, 80 + rz, 4, 0, Math.PI * 2);
+            radarCtx.fill();
+        }
+    });
+}
+
+// ==================== 8. ئاساسىي ئويۇن ئايلىنىشى (Game Loop) ====================
+function animate() {
+    requestAnimationFrame(animate);
+
+    // كوچا ۋە ئاسما كۆۋرۈكتىكى ماشىنىلارنىڭ ھەرىكىتى
+    cars.forEach(car => {
+        if (car.userData.isXAxis) {
+            car.position.x += car.userData.speed;
+            if (car.position.x > 1450) car.position.x = -1450;
+            if (car.position.x < -1450) car.position.x = 1450;
+        } else {
+            car.position.z += car.userData.speed;
+            if (car.position.z > 1450) car.position.z = -1450;
+            if (car.position.z < -1450) car.position.z = 1450;
+        }
+    });
+
+    if (gameStarted && !isGameOver) {
+        const boost = keys['ShiftLeft'] || keys['ShiftRight'];
+        const brake = keys['ControlLeft'] || keys['ControlRight'];
+
+        const targetSpeed = boost ? 8.0 : (brake ? 2.5 : 4.4);
+        speed += (targetSpeed - speed) * 0.06;
+
+        let targetRoll = 0;
+        if (keys['KeyA'] || keys['ArrowLeft']) {
+            jetYaw += 0.022;
+            targetRoll = 0.55;
+        } else if (keys['KeyD'] || keys['ArrowRight']) {
+            jetYaw -= 0.022;
+            targetRoll = -0.55;
+        }
+        jetRoll += (targetRoll - jetRoll) * 0.1;
+
+        if (keys['KeyW'] || keys['ArrowUp']) {
+            jetPitch = Math.min(jetPitch + 0.018, 0.55);
+        } else if (keys['KeyS'] || keys['ArrowDown']) {
+            jetPitch = Math.max(jetPitch - 0.018, -0.55);
+        } else {
+            jetPitch *= 0.96;
+        }
+
+        jet.rotation.order = 'YXZ';
+        jet.rotation.y = jetYaw;
+        jet.rotation.x = jetPitch;
+        jet.rotation.z = jetRoll;
+
+        jet.translateZ(-speed);
+
+        if (jet.position.y < 38) {
+            jet.position.y = 38;
+            if (jetPitch < 0) jetPitch = 0;
+        }
+
+        if (keys['Space'] && gunCooldown <= 0) {
+            fireBullet();
+            gunCooldown = 5;
+        }
+        if (gunCooldown > 0) gunCooldown--;
+
+        jet.userData.flames.forEach(f => {
+            const s = boost ? (1.6 + Math.random() * 0.6) : (0.85 + Math.random() * 0.3);
+            f.scale.set(1, 1, s);
+            f.material.color.setHex(boost ? 0x00ccff : 0xff6600);
+        });
+
+        sound.updateEngine((speed - 2) / 6.5, boost, false);
+
+        const camDist = 26 + (boost ? 5 : 0);
+        let camX = jet.position.x + Math.sin(jetYaw) * camDist;
+        let camZ = jet.position.z + Math.cos(jetYaw) * camDist;
+        let camY = jet.position.y + 7.5 - jetPitch * 8;
+
+        if (screenShake > 0) {
+            camX += (Math.random() - 0.5) * screenShake * 0.4;
+            camY += (Math.random() - 0.5) * screenShake * 0.4;
+            screenShake *= 0.85;
+            if (screenShake < 0.5) screenShake = 0;
+        }
+
+        camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.15);
+
+        const lookX = jet.position.x - Math.sin(jetYaw) * 50;
+        const lookZ = jet.position.z - Math.cos(jetYaw) * 50;
+        const lookY = jet.position.y + jetPitch * 35;
+        camera.lookAt(lookX, lookY, lookZ);
+
+        const kmh = Math.round(speed * 240);
+        document.getElementById('spd-val').innerText = kmh;
+        document.getElementById('spd-bar').style.width = Math.min(100, (kmh / 2000) * 100) + '%';
+        document.getElementById('alt-val').innerText = Math.round(jet.position.y);
+    }
+
+    // ==================== 5 دۈشمەن ئايروپىلانىنىڭ AI ھەرىكىتى ۋە ئوق ئېتىشى ====================
+    enemies.forEach(e => {
+        const data = e.userData;
+        data.turnTimer--;
+
+        const dx = jet.position.x - e.position.x;
+        const dz = jet.position.z - e.position.z;
+        const distToPlayer = Math.sqrt(dx * dx + dz * dz);
+
+        if (distToPlayer > 450) {
+            const desiredYaw = Math.atan2(-dx, -dz);
+            let diff = desiredYaw - data.yaw;
+            diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+            data.yaw += diff * 0.024;
+            data.roll = THREE.MathUtils.clamp(-diff * 0.8, -0.5, 0.5);
+            data.targetAlt = jet.position.y + (Math.sin(Date.now() * 0.002) * 40);
+        } else {
+            if (data.turnTimer <= 0) {
+                data.turnRate = (Math.random() - 0.5) * 0.025;
+                data.targetAlt = 240 + Math.random() * 300;
+                data.turnTimer = 70 + Math.random() * 100;
+            }
+            data.yaw += data.turnRate;
+            data.roll += (-data.turnRate * 18 - data.roll) * 0.08;
+        }
+
+        const altDiff = data.targetAlt - e.position.y;
+        data.pitch = THREE.MathUtils.clamp(altDiff * 0.0035, -0.35, 0.35);
+
+        e.rotation.order = 'YXZ';
+        e.rotation.y = data.yaw;
+        e.rotation.x = data.pitch;
+        e.rotation.z = data.roll;
+
+        e.translateZ(-data.speed);
+
+        const ring = e.getObjectByName("targetRing");
+        if (ring) ring.lookAt(camera.position);
+
+        if (gameStarted && !isGameOver) {
+            data.shootCooldown--;
+            if (data.shootCooldown <= 0 && distToPlayer < 1150) {
+                fireEnemyBullet(e);
+                data.shootCooldown = 75 + Math.floor(Math.random() * 85);
+            }
+
+            if (e.position.distanceTo(jet.position) < 28) {
+                createExplosion(e.position, 50);
+                scene.remove(e);
+                enemies.splice(enemies.indexOf(e), 1);
+                spawnEnemyJet();
+                applyDamage(25);
+            }
+        }
+    });
+
+    // دۈشمەن ئوقلىرىنى تەكشۈرۈش
+    for (let i = enemyBullets.length - 1; i >= 0; i--) {
+        const eb = enemyBullets[i];
+        eb.position.add(eb.userData.vel);
+        eb.userData.life--;
+
+        if (!isGameOver && eb.position.distanceTo(jet.position) < 20) {
+            applyDamage(8);
+            createExplosion(eb.position, 8);
+            eb.userData.life = 0;
+        }
+
+        if (eb.userData.life <= 0) {
+            scene.remove(eb);
+            enemyBullets.splice(i, 1);
+        }
+    }
+
+    // ئويۇنچى ئوقلىرىنى تەكشۈرۈش
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.position.add(b.userData.vel);
+        b.userData.life--;
+
+        for (let j = enemies.length - 1; j >= 0; j--) {
+            if (b.position.distanceTo(enemies[j].position) < 34) {
+                createExplosion(enemies[j].position, 45);
+                scene.remove(enemies[j]);
+                enemies.splice(j, 1);
+                spawnEnemyJet();
+                kills++;
+                healPlayer(15);
+                document.getElementById('kills-val').innerText = kills;
+                showKillBanner();
+                b.userData.life = 0;
+                break;
+            }
+        }
+        if (b.userData.life <= 0) {
+            scene.remove(b);
+            bullets.splice(i, 1);
+        }
+    }
+
+    // قوغلىغۇچى راكېتالارنى تەكشۈرۈش
+    for (let i = missiles.length - 1; i >= 0; i--) {
+        const m = missiles[i];
+        if (m.userData.target && enemies.includes(m.userData.target)) {
+            const desired = new THREE.Vector3().subVectors(m.userData.target.position, m.position).normalize().multiplyScalar(22);
+            m.userData.vel.lerp(desired, 0.12);
+            m.lookAt(m.position.clone().add(m.userData.vel));
+        }
+        m.position.add(m.userData.vel);
+        m.userData.life--;
+
+        const smoke = new THREE.Mesh(
+            new THREE.SphereGeometry(1.3, 4, 4),
+            new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.6 })
+        );
+        smoke.position.copy(m.position);
+        smoke.userData = { vel: new THREE.Vector3(), life: 0.4 };
+        scene.add(smoke);
+        particles.push(smoke);
+
+        for (let j = enemies.length - 1; j >= 0; j--) {
+            if (m.position.distanceTo(enemies[j].position) < 38) {
+                createExplosion(enemies[j].position, 65);
+                scene.remove(enemies[j]);
+                enemies.splice(j, 1);
+                spawnEnemyJet();
+                kills++;
+                healPlayer(15);
+                document.getElementById('kills-val').innerText = kills;
+                showKillBanner();
+                m.userData.life = 0;
+                break;
+            }
+        }
+        if (m.userData.life <= 0) {
+            scene.remove(m);
+            missiles.splice(i, 1);
+        }
+    }
+
+    // پارتلاش زەررىچىلىرىنى يېڭىلاش
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.position.add(p.userData.vel);
+        p.userData.life -= 0.03;
+        p.scale.multiplyScalar(0.95);
+        if (p.userData.life <= 0) {
+            scene.remove(p);
+            particles.splice(i, 1);
+        }
+    }
+
+    drawRadar();
+    renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+animate();
+</script>
+</body>
+</html>

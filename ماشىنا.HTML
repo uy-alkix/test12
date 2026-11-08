@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ug" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D زامانىۋى شەھەر - تىك ئۇچار ئايروپىلان سىستېمىسى</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #87CEEB;
+            user-select: none;
+        }
+        /* --- باشلاش كۆزنىكى --- */
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: #ffffff;
+            transition: opacity 0.6s ease;
+        }
+        #start-screen h1 {
+            font-size: 40px;
+            margin: 0 0 10px 0;
+            color: #38bdf8;
+            text-shadow: 0 0 25px rgba(56, 189, 248, 0.5);
+        }
+        #start-screen p {
+            font-size: 16px;
+            color: #94a3b8;
+            margin: 0 0 30px 0;
+        }
+        .spawn-options {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .spawn-btn {
+            background: rgba(30, 41, 59, 0.8);
+            border: 2px solid #334155;
+            color: #cbd5e1;
+            padding: 12px 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .spawn-btn:hover, .spawn-btn.active {
+            background: #0284c7;
+            border-color: #38bdf8;
+            color: #fff;
+            box-shadow: 0 0 15px rgba(2, 132, 199, 0.5);
+        }
+        #launch-btn {
+            background: linear-gradient(135deg, #0284c7, #2563eb);
+            color: white;
+            border: none;
+            padding: 16px 45px;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 35px;
+            cursor: pointer;
+            box-shadow: 0 8px 25px rgba(37, 99, 235, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        #launch-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 12px 35px rgba(37, 99, 235, 0.6);
+        }
+
+        #action-prompt {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.9);
+            color: #38bdf8;
+            padding: 12px 26px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border: 1px solid #38bdf8;
+            display: none;
+            z-index: 15;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        #event-toast {
+            position: absolute;
+            top: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(220, 38, 38, 0.9);
+            color: #fff;
+            padding: 10px 22px;
+            border-radius: 20px;
+            font-size: 15px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 20;
+        }
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 10px;
+            height: 10px;
+            transform: translate(-50%, -50%);
+            border: 2px solid rgba(255,255,255,0.7);
+            border-radius: 50%;
+            pointer-events: none;
+            display: none;
+            z-index: 10;
+        }
+        #flight-hud {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(15, 23, 42, 0.85);
+            color: #38bdf8;
+            padding: 12px 18px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: monospace;
+            display: none;
+            z-index: 15;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="start-screen">
+        <h1>🚁 3D شەھەر ۋە تىك ئۇچار ئايروپىلان</h1>
+        <p>بۇگاتتى ماشىنىلىرى، تاڭكىلار ۋە ئاسمان ساياھىتى</p>
+        
+        <div style="font-size: 15px; color: #38bdf8; margin-bottom: 10px;">چۈشۈش ئورنىنى تاللاڭ:</div>
+        <div class="spawn-options">
+            <button class="spawn-btn active" onclick="setSpawn(0, 0, this)">🏙️ مەركىزىي مەيدان</button>
+            <button class="spawn-btn" onclick="setSpawn(-140, -200, this)">🪖 ھەربىي بازا (تاڭكىلار)</button>
+            <button class="spawn-btn" onclick="setSpawn(200, -200, this)">🚁 تىك ئۇچار مەيدانى</button>
+        </div>
+
+        <button id="launch-btn" onclick="startGame()">🎮 ئويۇننى باشلاش</button>
+    </div>
+
+    <div id="action-prompt">ئوبيېكتقا چىقىش ئۈچۈن [F] نى بېسىڭ</div>
+    <div id="event-toast">💥 ئاگاھلاندۇرۇش يۈز بەردى!</div>
+    <div id="crosshair"></div>
+    <div id="flight-hud">🚁 ئېگىزلىك: <span id="altitude">0</span> مېتىر</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        let audioCtx = null, soundEnabled = true;
+        let engineOsc = null, engineGain = null;
+
+        function initAudio() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            engineOsc = audioCtx.createOscillator();
+            engineGain = audioCtx.createGain();
+            engineOsc.type = 'sawtooth';
+            engineOsc.frequency.value = 45;
+            engineGain.gain.value = 0.0;
+            
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 280;
+
+            engineOsc.connect(filter);
+            filter.connect(engineGain);
+            engineGain.connect(audioCtx.destination);
+            engineOsc.start();
+        }
+
+        function playHornSound() {
+            if (!soundEnabled || !audioCtx) return;
+            const now = audioCtx.currentTime;
+            [420, 520].forEach(f => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.value = f;
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            });
+        }
+
+        function showToast(msg) {
+            const el = document.getElementById('event-toast');
+            el.innerText = msg;
+            el.style.opacity = '1';
+            clearTimeout(el._timer);
+            el._timer = setTimeout(() => el.style.opacity = '0', 1800);
+        }
+
+        // --- SEHNE ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.FogExp2(0x87CEEB, 0.0006);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 2600);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+        const sunLight = new THREE.DirectionalLight(0xfff8e7, 0.9);
+        sunLight.position.set(300, 700, 250);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        const d = 350;
+        sunLight.shadow.camera.left = -d; sunLight.shadow.camera.right = d;
+        sunLight.shadow.camera.top = d; sunLight.shadow.camera.bottom = -d;
+        scene.add(sunLight);
+
+        const CITY_SIZE = 3000, HALF_CITY = CITY_SIZE / 2, BLOCK_SIZE = 100, ROAD_WIDTH = 24;
+
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(CITY_SIZE, CITY_SIZE),
+            new THREE.MeshStandardMaterial({ color: 0x262936, roughness: 0.9 })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        function createBuildingTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1e293b'; ctx.fillRect(0, 0, 128, 256);
+            for (let y = 8; y < 248; y += 16) {
+                for (let x = 8; x < 120; x += 16) {
+                    ctx.fillStyle = Math.random() > 0.35 ? '#bae6fd' : '#334155';
+                    ctx.fillRect(x, y, 10, 10);
+                }
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+            return tex;
+        }
+
+        const buildingPositions = [];
+        function generateCity() {
+            const gridCount = CITY_SIZE / BLOCK_SIZE;
+            const sidewalkGeo = new THREE.BoxGeometry(BLOCK_SIZE - ROAD_WIDTH, 0.4, BLOCK_SIZE - ROAD_WIDTH);
+            const sidewalkMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.8 });
+            const sidewalks = new THREE.InstancedMesh(sidewalkGeo, sidewalkMat, gridCount * gridCount);
+            sidewalks.receiveShadow = true;
+
+            const bldgGeo = new THREE.BoxGeometry(1, 1, 1);
+            bldgGeo.translate(0, 0.5, 0);
+            const bldgMat = new THREE.MeshStandardMaterial({ map: createBuildingTexture(), roughness: 0.25, metalness: 0.55 });
+            const buildings = new THREE.InstancedMesh(bldgGeo, bldgMat, gridCount * gridCount * 4);
+            buildings.castShadow = true; buildings.receiveShadow = true;
+
+            const dummy = new THREE.Object3D(), color = new THREE.Color();
+            let swIdx = 0, bIdx = 0;
+
+            for (let gx = -gridCount / 2; gx < gridCount / 2; gx++) {
+                for (let gz = -gridCount / 2; gz < gridCount / 2; gz++) {
+                    const cx = gx * BLOCK_SIZE + BLOCK_SIZE / 2;
+                    const cz = gz * BLOCK_SIZE + BLOCK_SIZE / 2;
+                    dummy.position.set(cx, 0.2, cz); dummy.scale.set(1, 1, 1);
+                    dummy.updateMatrix(); sidewalks.setMatrixAt(swIdx++, dummy.matrix);
+
+                    if (Math.abs(gx) <= 1 && Math.abs(gz) <= 1) continue;
+
+                    [[ -18, -18], [18, -18], [-18, 18], [18, 18]].forEach(o => {
+                        const bx = cx + o[0], bz = cz + o[1];
+                        const bw = 20 + Math.random() * 11, bd = 20 + Math.random() * 11;
+                        const dist = Math.sqrt(cx * cx + cz * cz);
+                        const bh = (35 + Math.random() * 135) * Math.max(0.35, 1.2 - dist / 1800);
+                        dummy.position.set(bx, 0.4, bz); dummy.scale.set(bw, bh, bd);
+                        dummy.updateMatrix(); buildings.setMatrixAt(bIdx, dummy.matrix);
+                        color.setHex([0xe2e8f0, 0x93c5fd, 0xcbd5e1, 0x7dd3fc, 0xf1f5f9][Math.floor(Math.random() * 5)]);
+                        buildings.setColorAt(bIdx++, color);
+                        buildingPositions.push({ minX: bx - bw/2 - 1, maxX: bx + bw/2 + 1, minZ: bz - bd/2 - 1, maxZ: bz + bd/2 + 1 });
+                    });
+                }
+            }
+            buildings.count = bIdx;
+            scene.add(sidewalks);
+            scene.add(buildings);
+        }
+        generateCity();
+
+        function isCollidingWithBuilding(x, z) {
+            if (Math.abs(x) > HALF_CITY - 10 || Math.abs(z) > HALF_CITY - 10) return true;
+            for (let i = 0; i < buildingPositions.length; i++) {
+                const b = buildingPositions[i];
+                if (x > b.minX && x < b.maxX && z > b.minZ && z < b.maxZ) return true;
+            }
+            return false;
+        }
+
+        // --- VEHICLES & HELICOPTER ---
+        function createBugattiMesh(primaryColor = 0xdc2626) {
+            const group = new THREE.Group();
+            const bodyMat = new THREE.MeshStandardMaterial({ color: primaryColor, roughness: 0.2, metalness: 0.7 });
+            const darkMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.5 });
+            const glassMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1 });
+
+            const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.85, 5.0), bodyMat);
+            chassis.position.y = 0.8; chassis.castShadow = true; group.add(chassis);
+
+            const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.7, 2.4), glassMat);
+            cabin.position.set(0, 1.45, -0.2); group.add(cabin);
+
+            const wheelGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.35, 16);
+            wheelGeo.rotateZ(Math.PI / 2);
+            [[-1.3, 0.45, 1.5], [1.3, 0.45, 1.5], [-1.3, 0.45, -1.5], [1.3, 0.45, -1.5]].forEach(p => {
+                const w = new THREE.Mesh(wheelGeo, darkMat);
+                w.position.set(...p); group.add(w);
+            });
+            return group;
+        }
+
+        // تىك ئۇچار ئايروپىلان (Helicopter) ياساش
+        function createHelicopterMesh() {
+            const group = new THREE.Group();
+            const heliMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.8 });
+            const glassMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.1, transparent: true, opacity: 0.7 });
+            const bladeMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.2 });
+
+            // گەۋدە
+            const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.8, 5.5), heliMat);
+            body.position.y = 1.2; body.castShadow = true; group.add(body);
+
+            // دېرىزە
+            const cockpit = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.3, 2.2), glassMat);
+            cockpit.position.set(0, 1.4, 1.5); group.add(cockpit);
+
+            // قۇيرۇق
+            const tail = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 4.5), heliMat);
+            tail.position.set(0, 1.5, -4.2); group.add(tail);
+
+            // ئاساسلىق ئايلانما پەرрак (Main Rotor)
+            const mainBlade = new THREE.Mesh(new THREE.BoxGeometry(8.5, 0.1, 0.6), bladeMat);
+            mainBlade.position.set(0, 2.3, 0); group.add(mainBlade);
+            group.userData.mainBlade = mainBlade;
+
+            return group;
+        }
+
+        const playerBugatti = createBugattiMesh(0xdc2626);
+        playerBugatti.position.set(8, 0, 8);
+        scene.add(playerBugatti);
+
+        const playerHeli = createHelicopterMesh();
+        playerHeli.position.set(200, 0, -200);
+        scene.add(playerHeli);
+
+        // --- CHARACTER ---
+        function createCharacterMesh() {
+            const group = new THREE.Group();
+            const shirtMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.4 });
+            const pantsMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 });
+            const skinMat = new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.5 });
+
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.3, 0.5), shirtMat);
+            torso.position.y = 1.95; torso.castShadow = true; group.add(torso);
+
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.65, 0.65), skinMat);
+            head.position.y = 3.0; head.castShadow = true; group.add(head);
+
+            const limbGeo = new THREE.BoxGeometry(0.32, 1.2, 0.32);
+            limbGeo.translate(0, -0.5, 0);
+
+            const leftLeg = new THREE.Mesh(limbGeo, pantsMat); leftLeg.position.set(-0.24, 1.3, 0); group.add(leftLeg);
+            const rightLeg = new THREE.Mesh(limbGeo, pantsMat); rightLeg.position.set(0.24, 1.3, 0); group.add(rightLeg);
+            const leftArm = new THREE.Mesh(limbGeo, shirtMat); leftArm.position.set(-0.68, 2.5, 0); group.add(leftArm);
+            const rightArm = new THREE.Mesh(limbGeo, shirtMat); rightArm.position.set(0.68, 2.5, 0); group.add(rightArm);
+
+            return { group };
+        }
+
+        const playerChar = createCharacterMesh();
+        const player = playerChar.group;
+        scene.add(player);
+
+        let spawnX = 0, spawnZ = 0;
+        function setSpawn(x, z, btn) {
+            spawnX = x; spawnZ = z;
+            document.querySelectorAll('.spawn-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+
+        let gameStarted = false;
+        function startGame() {
+            initAudio();
+            gameStarted = true;
+            document.getElementById('start-screen').style.opacity = '0';
+            setTimeout(() => document.getElementById('start-screen').style.display = 'none', 600);
+            document.getElementById('crosshair').style.display = 'block';
+
+            player.position.set(spawnX, 0.4, spawnZ);
+            playerBugatti.position.set(spawnX + 6, 0, spawnZ + 6);
+            document.body.requestPointerLock();
+        }
+
+        // --- CONTROLS ---
+        const keys = {};
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        let cameraAngleY = 0, cameraAngleX = 0.35, cameraDistance = 14;
+        let vehicleMode = 'foot'; // 'foot' | 'car' | 'heli'
+        let carSpeed = 0, carAngle = 0;
+        let heliSpeed = 0, heliAlt = 0.4, heliAngle = 0, heliVertSpeed = 0;
+
+        window.addEventListener('mousemove', e => {
+            if (!gameStarted || document.pointerLockElement !== document.body) return;
+            cameraAngleY -= e.movementX * 0.003;
+            cameraAngleX = Math.max(0.08, Math.min(Math.PI / 2 - 0.1, cameraAngleX + e.movementY * 0.003));
+        });
+
+        window.addEventListener('mousedown', () => {
+            if (gameStarted && document.pointerLockElement !== document.body) document.body.requestPointerLock();
+        });
+
+        window.addEventListener('keydown', e => {
+            if (e.code === 'KeyF' && gameStarted) {
+                const distCar = player.position.distanceTo(playerBugatti.position);
+                const distHeli = player.position.distanceTo(playerHeli.position);
+
+                if (vehicleMode === 'foot') {
+                    if (distCar < 7.0) {
+                        vehicleMode = 'car'; player.visible = false;
+                    } else if (distHeli < 8.0) {
+                        vehicleMode = 'heli'; player.visible = false;
+                        document.getElementById('flight-hud').style.display = 'block';
+                    }
+                } else {
+                    vehicleMode = 'foot';
+                    player.visible = true;
+                    player.position.set(playerBugatti.position.x + 3.0, 0.4, playerBugatti.position.z);
+                    carSpeed = 0; heliVertSpeed = 0;
+                    document.getElementById('flight-hud').style.display = 'none';
+                }
+            }
+        });
+
+        // --- ANIMATION LOOP ---
+        const clock = new THREE.Clock();
+        let velocityY = 0, isGrounded = true;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = Math.min(clock.getDelta(), 0.1);
+
+            if (!gameStarted) {
+                camera.position.set(Math.cos(clock.getElapsedTime() * 0.3) * 25, 12, Math.sin(clock.getElapsedTime() * 0.3) * 25);
+                camera.lookAt(0, 2, 0);
+                renderer.render(scene, camera);
+                return;
+            }
+
+            let activeEntity = player;
+            if (vehicleMode === 'car') activeEntity = playerBugatti;
+            if (vehicleMode === 'heli') activeEntity = playerHeli;
+
+            // 1. FOOT MODE
+            if (vehicleMode === 'foot') {
+                const promptEl = document.getElementById('action-prompt');
+                const dCar = player.position.distanceTo(playerBugatti.position);
+                const dHeli = player.position.distanceTo(playerHeli.position);
+                promptEl.style.display = (dCar < 7.0 || dHeli < 8.0) ? 'block' : 'none';
+
+                let mx = 0, mz = 0;
+                if (keys['KeyW']) mz = -1; if (keys['KeyS']) mz = 1;
+                if (keys['KeyA']) mx = -1; if (keys['KeyD']) mx = 1;
+
+                if (mx !== 0 || mz !== 0) {
+                    const targetAngle = cameraAngleY + Math.atan2(mx, mz);
+                    player.rotation.y = targetAngle + Math.PI;
+                    const nx = player.position.x + Math.sin(targetAngle) * 12 * delta;
+                    const nz = player.position.z + Math.cos(targetAngle) * 12 * delta;
+                    if (!isCollidingWithBuilding(nx, player.position.z)) player.position.x = nx;
+                    if (!isCollidingWithBuilding(player.position.x, nz)) player.position.z = nz;
+                }
+
+                if (keys['Space'] && isGrounded) { velocityY = 14; isGrounded = false; }
+                velocityY -= 32 * delta;
+                player.position.y += velocityY * delta;
+                if (player.position.y <= 0.4) { player.position.y = 0.4; velocityY = 0; isGrounded = true; }
+            }
+            // 2. CAR MODE
+            else if (vehicleMode === 'car') {
+                document.getElementById('action-prompt').style.display = 'none';
+                if (keys['KeyW']) carSpeed += 35 * delta;
+                else if (keys['KeyS']) carSpeed -= 35 * delta;
+                else carSpeed *= 0.98;
+
+                carSpeed = Math.max(-20, Math.min(65, carSpeed));
+                if (Math.abs(carSpeed) > 0.5) {
+                    if (keys['KeyA']) carAngle += 2.2 * delta;
+                    if (keys['KeyD']) carAngle -= 2.2 * delta;
+                }
+                playerBugatti.rotation.y = carAngle;
+                const nx = playerBugatti.position.x + Math.sin(carAngle) * carSpeed * delta;
+                const nz = playerBugatti.position.z + Math.cos(carAngle) * carSpeed * delta;
+                if (!isCollidingWithBuilding(nx, nz)) {
+                    playerBugatti.position.x = nx; playerBugatti.position.z = nz;
+                } else { carSpeed = -carSpeed * 0.4; }
+            }
+            // 3. HELICOPTER MODE
+            else if (vehicleMode === 'heli') {
+                document.getElementById('action-prompt').style.display = 'none';
+                
+                // پەرракنى ئايلاندۇرۇش
+                if (playerHeli.userData.mainBlade) {
+                    playerHeli.userData.mainBlade.rotation.y += 25 * delta;
+                }
+
+                if (keys['KeyW']) heliSpeed += 25 * delta;
+                else if (keys['KeyS']) heliSpeed -= 25 * delta;
+                else heliSpeed *= 0.95;
+
+                if (keys['Space']) heliVertSpeed += 20 * delta; // ئاسمانغا كۆتۈرۈلۈش
+                else if (keys['KeyShiftLeft'] || keys['KeyShiftRight']) heliVertSpeed -= 20 * delta; // چۈشۈش
+                else heliVertSpeed *= 0.9;
+
+                heliSpeed = Math.max(-15, Math.min(50, heliSpeed));
+                heliVertSpeed = Math.max(-25, Math.min(25, heliVertSpeed));
+
+                if (keys['KeyA']) heliAngle += 2.0 * delta;
+                if (keys['KeyD']) heliAngle -= 2.0 * delta;
+
+                playerHeli.rotation.y = heliAngle;
+                playerHeli.position.x += Math.sin(heliAngle) * heliSpeed * delta;
+                playerHeli.position.z += Math.cos(heliAngle) * heliSpeed * delta;
+                playerHeli.position.y = Math.max(0.4, playerHeli.position.y + heliVertSpeed * delta);
+
+                document.getElementById('altitude').innerText = Math.round(playerHeli.position.y);
+            }
+
+            // CAMERA
+            camera.position.x = activeEntity.position.x + cameraDistance * Math.sin(cameraAngleY) * Math.cos(cameraAngleX);
+            camera.position.y = activeEntity.position.y + (vehicleMode === 'heli' ? 4 : 2.5) + cameraDistance * Math.sin(cameraAngleX);
+            camera.position.z = activeEntity.position.z + cameraDistance * Math.cos(cameraAngleY) * Math.cos(cameraAngleX);
+            camera.lookAt(activeEntity.position.x, activeEntity.position.y + 2.0, activeEntity.position.z);
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
